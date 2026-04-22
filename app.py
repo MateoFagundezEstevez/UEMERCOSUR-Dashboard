@@ -2,7 +2,6 @@ import streamlit as st
 import feedparser
 import pandas as pd
 import os
-from io import StringIO
 from streamlit_autorefresh import st_autorefresh
 
 # =========================
@@ -12,7 +11,7 @@ st.set_page_config(layout="wide")
 st_autorefresh(interval=600000)
 
 # =========================
-# ESTILO GLOBAL
+# ESTILO
 # =========================
 st.markdown("""
 <style>
@@ -71,47 +70,6 @@ def obtener_noticias():
     return noticias
 
 # =========================
-# ANÁLISIS
-# =========================
-# =========================
-# 🧠 DOCUMENTOS (DESCARGABLES)
-# =========================
-with col3:
-    st.subheader("📄 Documentos de análisis")
-
-    ruta = "analisis"
-
-    if not os.path.exists(ruta):
-        st.info("No hay carpeta /analisis")
-        st.stop()
-
-    archivos = [f for f in os.listdir(ruta) if f.endswith(".txt")]
-
-    if len(archivos) == 0:
-        st.info("No hay documentos disponibles")
-        st.stop()
-
-    for archivo in archivos:
-
-        path = os.path.join(ruta, archivo)
-
-        with open(path, "r", encoding="utf-8") as f:
-            contenido = f.read()
-
-        nombre = archivo.replace(".txt", "")
-
-        with st.expander(f"📄 {nombre}"):
-
-            st.write(contenido[:300] + "...")
-
-            st.download_button(
-                label="⬇️ Descargar documento",
-                data=contenido,
-                file_name=archivo,
-                mime="text/plain"
-            )
-
-# =========================
 # CSV SECTORES
 # =========================
 @st.cache_data
@@ -122,37 +80,56 @@ def cargar_sectores():
         st.error("No se encontró sectores.csv")
         return pd.DataFrame()
 
-    with open(ruta, "r", encoding="utf-8") as f:
-        contenido = f.read()
-
-    contenido = contenido.replace("\ufeff", "")
-
-    df = pd.read_csv(StringIO(contenido))
+    df = pd.read_csv(ruta)
     df.columns = df.columns.str.strip().str.lower()
 
     return df
 
 # =========================
+# DOCUMENTOS (TXT)
+# =========================
+def cargar_documentos():
+    ruta = "analisis"
+    docs = []
+
+    if not os.path.exists(ruta):
+        return []
+
+    for archivo in os.listdir(ruta):
+        if archivo.endswith(".txt"):
+            path = os.path.join(ruta, archivo)
+
+            with open(path, "r", encoding="utf-8") as f:
+                contenido = f.read()
+
+            docs.append({
+                "nombre": archivo.replace(".txt", ""),
+                "contenido": contenido
+            })
+
+    return docs
+
+# =========================
 # DATA
 # =========================
 noticias = obtener_noticias()
-analisis = cargar_analisis()
 df = cargar_sectores()
+docs = cargar_documentos()
 
 if df.empty:
-    st.warning("CSV vacío o no cargado correctamente")
+    st.warning("No se cargó el CSV de sectores")
     st.stop()
 
 # =========================
 # KPIs
 # =========================
-k1, k2, k3 = st.columns(3)
-k1.metric("Estado", "Negociación")
-k2.metric("Noticias", len(noticias))
-k3.metric("Sectores", len(df))
+c1, c2, c3 = st.columns(3)
+c1.metric("Estado", "Negociación")
+c2.metric("Noticias", len(noticias))
+c3.metric("Sectores", len(df))
 
 # =========================
-# LAYOUT
+# LAYOUT PRINCIPAL
 # =========================
 col1, col2, col3 = st.columns([1.3, 1, 1])
 
@@ -173,23 +150,24 @@ with col1:
         """, unsafe_allow_html=True)
 
 # =========================
-# 🏭 SECTORES (SIMPLIFICADO)
+# 🏭 SECTORES
 # =========================
 with col2:
     st.subheader("🏭 Sectores")
 
-    sectores = df["sector"].dropna().unique()
-    sector_sel = st.selectbox("Seleccionar sector", sectores)
+    sector_sel = st.selectbox(
+        "Seleccionar sector",
+        df["sector"].dropna().unique()
+    )
 
     fila = df[df["sector"] == sector_sel].iloc[0]
 
-    st.markdown(f"## {fila.get('sector','')}")
+    st.markdown(f"## {fila['sector']}")
 
     st.write(limpiar_texto(fila.get("resumen","")))
 
     st.divider()
 
-    # SOLO OPORTUNIDAD Y RIESGO
     colA, colB = st.columns(2)
 
     with colA:
@@ -207,47 +185,22 @@ with col2:
     st.write(limpiar_texto(fila.get("comentario_estrategico","")))
 
 # =========================
-# 🧠 ANÁLISIS
+# 📄 DOCUMENTOS DESCARGABLES
 # =========================
 with col3:
-    st.subheader("🧠 Análisis")
+    st.subheader("📄 Documentos")
 
-    if len(analisis) == 0:
-        st.info("No hay archivos en /analisis")
+    if len(docs) == 0:
+        st.info("No hay documentos en /analisis")
 
-    for titulo, resumen, contenido in analisis[:5]:
-        with st.expander(titulo):
-            st.write(resumen)
-            st.write("---")
-            st.write(contenido)
+    for doc in docs:
+        with st.expander(doc["nombre"]):
 
-# =========================
-# 📂 DOCUMENTOS
-# =========================
-st.subheader("📂 Documentos")
+            st.write(doc["contenido"][:300] + "...")
 
-colA, colB, colC = st.columns(3)
-
-with colA:
-    st.markdown("""
-    <div class="panel">
-    📜 <b>Texto del acuerdo</b><br>
-    <a href="#">Ver documento</a>
-    </div>
-    """, unsafe_allow_html=True)
-
-with colB:
-    st.markdown("""
-    <div class="panel">
-    📊 <b>Anexos</b><br>
-    <a href="#">Ver anexos</a>
-    </div>
-    """, unsafe_allow_html=True)
-
-with colC:
-    st.markdown("""
-    <div class="panel">
-    📅 <b>Cronograma</b><br>
-    <a href="#">Ver fechas</a>
-    </div>
-    """, unsafe_allow_html=True)
+            st.download_button(
+                label="⬇️ Descargar",
+                data=doc["contenido"],
+                file_name=doc["nombre"] + ".txt",
+                mime="text/plain"
+            )
