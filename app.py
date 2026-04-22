@@ -33,225 +33,107 @@ a { color: #58a6ff; }
 st.title("📊 Dashboard Acuerdo Mercosur - UE")
 
 # =========================
-# RSS NOTICIAS
+# CSV CARGA ROBUSTA
 # =========================
-RSS_FEEDS = [
-    "https://ec.europa.eu/commission/presscorner/api/rss",
-    "https://www.ft.com/rss/world"
-]
-
-@st.cache_data(ttl=600)
-def obtener_noticias():
-    noticias = []
-
-    for url in RSS_FEEDS:
-        feed = feedparser.parse(url)
-
-        for entry in feed.entries:
-            titulo = entry.get("title", "")
-            link = entry.get("link", "")
-            fecha = entry.get("published", "Sin fecha")
-
-            resumen = entry.get("summary", "") or entry.get("description", "")
-            resumen = resumen.replace("<p>", "").replace("</p>", "")
-            resumen = resumen[:200] + "..." if len(resumen) > 200 else resumen
-
-            if "mercosur" in titulo.lower() or "eu" in titulo.lower():
-                noticias.append((titulo, resumen, link, fecha))
-
-    return noticias
-
-# =========================
-# ANÁLISIS
-# =========================
-def cargar_analisis():
-    ruta = "analisis"
-    analisis_list = []
-
-    if os.path.exists(ruta):
-        for archivo in os.listdir(ruta):
-            if archivo.endswith(".txt"):
-                with open(os.path.join(ruta, archivo), "r", encoding="utf-8") as f:
-                    contenido = f.read()
-
-                titulo = archivo.replace(".txt", "")
-                resumen = contenido[:150] + "..."
-
-                analisis_list.append((titulo, resumen, contenido))
-
-    return analisis_list
-
-# =========================
-# CARGA ROBUSTA CSV
-# =========================
-def cargar_sectores():
+@st.cache_data
+def cargar_csv():
     try:
-        # Leer archivo como texto crudo
-        with open("sectores.csv", "r", encoding="utf-8") as f:
-            contenido = f.read()
+        df = pd.read_csv("sectores.csv", encoding="utf-8")
 
-        # 🔥 FIX: si el header está entre comillas lo limpiamos
-        if contenido.startswith('"'):
-            contenido = contenido.replace('"', '')
-
-        # Convertir a DataFrame
-        from io import StringIO
-        df = pd.read_csv(StringIO(contenido), sep=",")
-
-        # Limpiar columnas
-        df.columns = df.columns.str.strip().str.lower()
+        # normalización de columnas
+        df.columns = (
+            df.columns
+            .str.strip()
+            .str.lower()
+            .str.replace(" ", "_")
+        )
 
         return df
 
     except Exception as e:
-        st.error("Error leyendo sectores.csv")
-        st.write(e)
-        return None
+        st.error("Error cargando sectores.csv")
+        st.exception(e)
+        return pd.DataFrame()
+
+df = cargar_csv()
 
 # =========================
-# DATA
+# VALIDACIÓN
 # =========================
-noticias = obtener_noticias()
-analisis = cargar_analisis()
-df = cargar_sectores()
+if df.empty:
+    st.warning("No hay datos en sectores.csv")
+    st.stop()
 
 # =========================
 # KPIs
 # =========================
 k1, k2, k3 = st.columns(3)
-k1.metric("Estado", "Negociación")
-k2.metric("Noticias", len(noticias))
-k3.metric("Análisis", len(analisis))
+k1.metric("Filas", len(df))
+k2.metric("Columnas", len(df.columns))
+k3.metric("Dataset", "Activo")
 
 # =========================
-# LAYOUT
+# 🔎 EXPLORADOR DE DATOS (INTERACTIVO)
 # =========================
-col1, col2, col3 = st.columns([1.3, 1, 1])
+st.subheader("📊 Explorador del dataset")
+
+# Selector de columnas para filtrar
+columnas = df.columns.tolist()
+
+col_filtro = st.selectbox("Filtrar por columna (opcional)", ["(ninguno)"] + columnas)
+
+df_filtrado = df.copy()
+
+if col_filtro != "(ninguno)":
+    valores = df[col_filtro].dropna().unique().tolist()
+    seleccion = st.multiselect("Valores", valores)
+
+    if seleccion:
+        df_filtrado = df[df[col_filtro].isin(seleccion)]
+
+# Mostrar tabla interactiva
+st.dataframe(df_filtrado, use_container_width=True)
 
 # =========================
-# 📰 NOVEDADES
+# 🧠 PANEL INTELIGENTE SECTOR (SOLO SI EXISTE)
 # =========================
-with col1:
-    st.subheader("📰 Novedades")
+if "sector" in df.columns:
+    st.subheader("🏭 Vista por sector")
 
-    for titulo, resumen, link, fecha in noticias[:6]:
-        st.markdown(f"""
-        <div class="panel">
-            <div style="font-weight:600;">{titulo}</div>
-            <div style="font-size:12px; color:#9da7b3;">{fecha}</div>
-            <div style="margin-top:8px;">{resumen}</div>
-            <a href="{link}" target="_blank">Leer más</a>
-        </div>
-        """, unsafe_allow_html=True)
+    sector = st.selectbox("Seleccionar sector", df["sector"].dropna().unique())
 
-# =========================
-# 🏭 SECTORES
-# =========================
-# =========================
-# 🏭 SECTORES INTERACTIVO
-# =========================
-with col2:
-    st.subheader("🏭 Sectores")
+    fila = df[df["sector"] == sector].iloc[0]
 
-    if df is None or df.empty:
-        st.warning("No hay datos en sectores.csv")
-        st.stop()
-
-    # Selector de sector
-    sector_seleccionado = st.selectbox(
-        "Seleccionar sector",
-        df["sector"]
-    )
-
-    # Filtrar
-    fila = df[df["sector"] == sector_seleccionado].iloc[0]
-
-    # Colores
-    color_oportunidad = "#3fb950" if fila["oportunidad"] == "Alta" else "#d29922"
-    color_riesgo = "#f85149" if fila["riesgo"] == "Alto" else "#d29922"
-
-    # Render ficha
     st.markdown(f"""
     <div class="panel">
+        <h3>{fila.get('sector','')}</h3>
 
-        <div style="font-size:18px; font-weight:700;">
-            {fila['sector']}
-        </div>
+        <p>{fila.get('resumen','')}</p>
 
-        <div style="margin-top:8px;">
-            {fila['resumen']}
-        </div>
+        <hr>
 
-        <hr style="border:0.5px solid #30363d;">
+        <b>Arancel:</b> {fila.get('arancel_actual','?')} → {fila.get('arancel_futuro','?')}<br>
+        <b>Cuotas:</b> {fila.get('cuotas','?')}<br>
+        <b>Barreras:</b> {fila.get('barreras','?')}<br>
+        <b>Oportunidad:</b> {fila.get('oportunidad','?')}<br>
+        <b>Riesgo:</b> {fila.get('riesgo','?')}<br>
 
-        <div style="font-size:13px;">
-            <b>Arancel:</b> {fila['arancel_actual']} → {fila['arancel_futuro']}<br>
-            <b>Cuotas:</b> {fila['cuotas']}<br>
-            <b>Barreras:</b> {fila['barreras']}<br>
-            <b>Oportunidad Uruguay:</b> {fila['oportunidad_uy']}<br>
-        </div>
+        <hr>
 
-        <hr style="border:0.5px solid #30363d;">
-
-        <div style="font-size:14px;">
-            <span style="color:{color_oportunidad}; font-weight:bold;">
-                Oportunidad: {fila['oportunidad']}
-            </span> |
-            <span style="color:{color_riesgo}; font-weight:bold;">
-                Riesgo: {fila['riesgo']}
-            </span>
-        </div>
-
-        <div style="margin-top:10px; font-size:14px;">
-            💡 <b>Insight estratégico:</b><br>
-            {fila['comentario_estrategico']}
-        </div>
-
+        💡 <b>Insight:</b><br>
+        {fila.get('comentario_estrategico','')}
     </div>
     """, unsafe_allow_html=True)
 
-# =========================
-# 🧠 ANÁLISIS
-# =========================
-with col3:
-    st.subheader("🧠 Análisis")
-
-    if len(analisis) == 0:
-        st.info("Cargar archivos en /analisis")
-
-    for titulo, resumen, contenido in analisis[:5]:
-        with st.expander(titulo):
-            st.write(resumen)
-            st.write("---")
-            st.write(contenido)
+else:
+    st.info("No existe columna 'sector' en el CSV. Se muestra solo explorador general.")
 
 # =========================
-# 📂 DOCUMENTOS
+# DESCARGA
 # =========================
-st.subheader("📂 Documentos")
-
-colA, colB, colC = st.columns(3)
-
-with colA:
-    st.markdown("""
-    <div class="panel">
-    📜 <b>Texto del acuerdo</b><br>
-    <a href="#">Ver documento</a>
-    </div>
-    """, unsafe_allow_html=True)
-
-with colB:
-    st.markdown("""
-    <div class="panel">
-    📊 <b>Anexos</b><br>
-    <a href="#">Ver anexos</a>
-    </div>
-    """, unsafe_allow_html=True)
-
-with colC:
-    st.markdown("""
-    <div class="panel">
-    📅 <b>Cronograma</b><br>
-    <a href="#">Ver fechas</a>
-    </div>
-    """, unsafe_allow_html=True)
+st.download_button(
+    "⬇️ Descargar dataset filtrado",
+    df_filtrado.to_csv(index=False).encode("utf-8"),
+    "sectores_filtrado.csv",
+    "text/csv"
+)
