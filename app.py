@@ -1,59 +1,56 @@
 import streamlit as st
 import feedparser
 import pandas as pd
+import os
 from streamlit_autorefresh import st_autorefresh
 
-# CONFIG
+# =========================
+# CONFIGURACIÓN
+# =========================
 st.set_page_config(layout="wide")
-
-# AUTO REFRESH
-st_autorefresh(interval=600000)
+st_autorefresh(interval=600000)  # 10 min
 
 # =========================
-# 🎨 ESTILO MILITAR (CSS)
+# ESTILO (LEGIBLE + OSCURO)
 # =========================
 st.markdown("""
 <style>
 body {
-    background-color: #0a0f0a;
+    background-color: #0e1117;
 }
-
 .block-container {
-    background-color: #0a0f0a;
-    color: #00ff9c;
-    font-family: "Courier New", monospace;
+    background-color: #0e1117;
+    color: #e6edf3;
+    font-family: -apple-system, BlinkMacSystemFont, sans-serif;
 }
+h1 { color: #ffffff; }
+h2, h3 { color: #c9d1d9; }
 
-/* Títulos */
-h1, h2, h3 {
-    color: #00ff9c;
-}
-
-/* Cajas tipo panel */
 .panel {
-    border: 1px solid #00ff9c;
-    padding: 15px;
-    border-radius: 8px;
-    background-color: #0d140d;
-    margin-bottom: 10px;
+    border: 1px solid #30363d;
+    padding: 14px;
+    border-radius: 10px;
+    background-color: #161b22;
+    margin-bottom: 12px;
 }
 
-/* Estados */
-.green { color: #00ff9c; }
-.red { color: #ff4d4d; }
-.yellow { color: #ffd166; }
+.badge-green { color: #3fb950; font-weight: bold; }
+.badge-yellow { color: #d29922; font-weight: bold; }
+.badge-red { color: #f85149; font-weight: bold; }
 
-/* Links */
-a {
-    color: #00ff9c;
-}
+a { color: #58a6ff; text-decoration: none; }
+a:hover { text-decoration: underline; }
 </style>
 """, unsafe_allow_html=True)
 
 # =========================
-# 🧠 DATA
+# TÍTULO
 # =========================
+st.title("📊 Dashboard Acuerdo Mercosur - UE")
 
+# =========================
+# RSS NOTICIAS
+# =========================
 RSS_FEEDS = [
     "https://ec.europa.eu/commission/presscorner/api/rss",
     "https://www.ft.com/rss/world"
@@ -62,10 +59,8 @@ RSS_FEEDS = [
 @st.cache_data(ttl=600)
 def obtener_noticias():
     noticias = []
-
     for url in RSS_FEEDS:
         feed = feedparser.parse(url)
-
         for entry in feed.entries:
             titulo = entry.title
             link = entry.link
@@ -73,86 +68,107 @@ def obtener_noticias():
 
             if "mercosur" in titulo.lower() or "eu" in titulo.lower():
                 noticias.append((titulo, link, fecha))
-
     return noticias
 
 def resumen_simple(texto):
-    return texto[:100] + "..."
+    return texto[:120] + "..."
 
+# =========================
+# ANÁLISIS DESDE ARCHIVOS
+# =========================
+def cargar_analisis():
+    ruta = "analisis"
+    analisis_list = []
+
+    if os.path.exists(ruta):
+        for archivo in os.listdir(ruta):
+            if archivo.endswith(".txt"):
+                with open(os.path.join(ruta, archivo), "r", encoding="utf-8") as f:
+                    contenido = f.read()
+
+                titulo = archivo.replace(".txt", "")
+                resumen = contenido[:150] + "..."
+
+                analisis_list.append((titulo, resumen, contenido))
+
+    return analisis_list
+
+# =========================
+# DATA
+# =========================
 noticias = obtener_noticias()
+analisis = cargar_analisis()
 
 # =========================
-# 🪖 HEADER
-# =========================
-st.title("🪖 CENTRO DE COMANDO | ACUERDO MERCOSUR - UE")
-
-# =========================
-# 📊 KPIs ARRIBA
+# KPIs
 # =========================
 kpi1, kpi2, kpi3 = st.columns(3)
-
-kpi1.metric("Estado", "En negociación")
-kpi2.metric("Noticias activas", len(noticias))
-kpi3.metric("Sectores cargados", "Manual")
+kpi1.metric("Estado", "Negociación")
+kpi2.metric("Noticias", len(noticias))
+kpi3.metric("Análisis", len(analisis))
 
 # =========================
-# 🧱 LAYOUT PRINCIPAL
+# LAYOUT PRINCIPAL
 # =========================
-
 col1, col2, col3 = st.columns([1.3, 1, 1])
 
+# =========================
 # 📰 NOVEDADES
+# =========================
 with col1:
-    st.subheader("📰 INTEL | NOVEDADES")
+    st.subheader("📰 Novedades")
 
     for titulo, link, fecha in noticias[:5]:
         st.markdown(f"""
         <div class="panel">
-            <b>{titulo}</b><br>
-            <span class="yellow">{fecha}</span><br>
+            <div style="font-size:16px; font-weight:600;">{titulo}</div>
+            <div style="font-size:12px; color:#8b949e;">{fecha}</div>
             <a href="{link}" target="_blank">Leer más</a>
         </div>
         """, unsafe_allow_html=True)
 
-# 🏭 SECTORES
+# =========================
+# 🏭 SECTORES (CSV)
+# =========================
 with col2:
-    st.subheader("🏭 SECTORES ESTRATÉGICOS")
+    st.subheader("🏭 Sectores")
 
     try:
         df = pd.read_csv("sectores.csv")
 
         for _, row in df.iterrows():
-            color = "green" if row["oportunidad"] == "Alta" else "yellow"
+            color = "badge-green" if row["oportunidad"] == "Alta" else "badge-yellow"
 
             st.markdown(f"""
             <div class="panel">
-                <b>{row['sector']}</b><br>
-                {row['resumen']}<br>
-                <span class="{color}">Nivel: {row['oportunidad']}</span>
+                <div style="font-weight:600;">{row['sector']}</div>
+                <div style="font-size:14px;">{row['resumen']}</div>
+                <div class="{color}">Nivel: {row['oportunidad']}</div>
             </div>
             """, unsafe_allow_html=True)
 
     except:
-        st.warning("Cargar archivo sectores.csv")
+        st.info("Cargar archivo sectores.csv")
 
-# 🧠 OPINIÓN
+# =========================
+# 🧠 ANÁLISIS (DESDE CARPETA)
+# =========================
 with col3:
-    st.subheader("🧠 ANÁLISIS")
+    st.subheader("🧠 Análisis")
 
-    for titulo, link, fecha in noticias[:5]:
-        st.markdown(f"""
-        <div class="panel">
-            <b>{titulo}</b><br>
-            {resumen_simple(titulo)}<br>
-            <a href="{link}" target="_blank">Ver análisis</a>
-        </div>
-        """, unsafe_allow_html=True)
+    if len(analisis) == 0:
+        st.info("Cargar archivos en carpeta /analisis")
+
+    for titulo, resumen, contenido in analisis[:5]:
+        with st.expander(titulo):
+            st.write(resumen)
+            st.write("---")
+            st.write(contenido)
 
 # =========================
 # 📂 DOCUMENTOS
 # =========================
-
-st.subheader("📂 ARCHIVOS DEL ACUERDO")
+st.subheader("📂 Documentos del acuerdo")
 
 colA, colB, colC = st.columns(3)
 
@@ -160,7 +176,7 @@ with colA:
     st.markdown("""
     <div class="panel">
     📜 <b>Texto del acuerdo</b><br>
-    <a href="#">Descargar</a>
+    <a href="#">Ver documento</a>
     </div>
     """, unsafe_allow_html=True)
 
@@ -168,7 +184,7 @@ with colB:
     st.markdown("""
     <div class="panel">
     📊 <b>Anexos</b><br>
-    <a href="#">Ver documentos</a>
+    <a href="#">Ver anexos</a>
     </div>
     """, unsafe_allow_html=True)
 
