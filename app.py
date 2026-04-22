@@ -6,42 +6,83 @@ from streamlit_autorefresh import st_autorefresh
 # =========================
 # CONFIG
 # =========================
-st.set_page_config(layout="wide")
+st.set_page_config(page_title="UE–Mercosur Intelligence", layout="wide")
 st_autorefresh(interval=600000)
 
 # =========================
-# ESTILO SIMPLE
+# ESTILO (UI MÁS PREMIUM)
 # =========================
 st.markdown("""
 <style>
 .block-container {
     background-color: #0e1117;
     color: #e6edf3;
+    padding-top: 2rem;
 }
+
+.card {
+    background-color: #161b22;
+    border: 1px solid #30363d;
+    padding: 16px;
+    border-radius: 12px;
+    margin-bottom: 12px;
+}
+
+.title {
+    font-size: 28px;
+    font-weight: 700;
+}
+
+.subtitle {
+    color: #9da7b3;
+    margin-bottom: 20px;
+}
+
+.badge {
+    display:inline-block;
+    padding:4px 8px;
+    border-radius:6px;
+    font-size:12px;
+    margin-right:6px;
+}
+
+.badge.green { background:#1f6f3a; }
+.badge.blue { background:#1f3a6f; }
+
+a { color: #58a6ff; text-decoration: none; }
 </style>
 """, unsafe_allow_html=True)
 
-st.title("📊 Inteligencia UE–Mercosur")
+# =========================
+# HEADER (MÁS INVITACIÓN)
+# =========================
+st.markdown('<div class="title">📊 UE–Mercosur Intelligence Brief</div>', unsafe_allow_html=True)
+st.markdown('<div class="subtitle">Seguimiento estratégico del acuerdo comercial Unión Europea – Mercosur</div>', unsafe_allow_html=True)
 
 # =========================
-# FOCO ESTRATÉGICO
+# FOCO SEMÁNTICO REAL
 # =========================
-KEYWORDS = [
-    "mercosur", "unión europea", "ue", "eu",
-    "acuerdo", "trade", "comercio",
-    "arancel", "tariff", "negociación",
-    "ratificación"
-]
+def es_relevante(texto):
+
+    texto = texto.lower()
+
+    # explícito
+    if "ue mercosur" in texto or "eu mercosur" in texto or "acuerdo ue mercosur" in texto:
+        return True
+
+    # ambos conceptos juntos
+    ue = "eu" in texto or "ue" in texto or "unión europea" in texto
+    mercosur = "mercosur" in texto
+
+    return ue and mercosur
 
 # =========================
-# RSS (ajustado y estable)
+# RSS
 # =========================
-RSS_FEEDS = [
+RSS = [
     "https://www.elpais.com.uy/rss/portada.xml",
     "https://www.elobservador.com.uy/rss/portada.xml",
     "https://www.montevideo.com.uy/noticias/rss",
-    "https://www.lr21.com.uy/feed",
-    "https://www.teledoce.com/feed/",
     "https://www.ft.com/rss/world",
     "https://www.economist.com/latest/rss.xml",
     "https://ec.europa.eu/commission/presscorner/api/rss"
@@ -51,61 +92,59 @@ RSS_FEEDS = [
 # NOTICIAS
 # =========================
 @st.cache_data(ttl=600)
-def obtener_noticias():
+def get_news():
 
-    noticias = []
+    news = []
 
-    for url in RSS_FEEDS:
+    for url in RSS:
 
         try:
             feed = feedparser.parse(url)
 
             for e in feed.entries:
 
-                titulo = e.get("title", "")
+                title = e.get("title", "")
                 link = e.get("link", "")
-                fecha = e.get("published", "Sin fecha")
+                date = e.get("published", "Sin fecha")
+                summary = (e.get("summary", "") or "")[:220]
 
-                resumen = (e.get("summary", "") or "")[:250]
+                text = (title + " " + summary)
 
-                texto = (titulo + " " + resumen).lower()
-
-                # filtro fuerte UE–Mercosur
-                if not any(k in texto for k in KEYWORDS):
+                if not es_relevante(text):
                     continue
 
-                score = sum(k in texto for k in KEYWORDS)
+                score = sum(k in text.lower() for k in ["eu", "ue", "mercosur", "acuerdo"])
 
-                noticias.append({
-                    "titulo": titulo,
-                    "resumen": resumen,
+                news.append({
+                    "title": title,
+                    "summary": summary,
                     "link": link,
-                    "fecha": fecha,
+                    "date": date,
                     "score": score
                 })
 
         except:
             continue
 
-    return sorted(noticias, key=lambda x: x["score"], reverse=True)
+    return sorted(news, key=lambda x: x["score"], reverse=True)
 
 # =========================
 # DOCUMENTOS
 # =========================
-def cargar_docs():
+def get_docs():
 
-    ruta = "analisis"
+    path = "analisis"
     docs = []
 
-    if not os.path.exists(ruta):
+    if not os.path.exists(path):
         return docs
 
-    for f in os.listdir(ruta):
+    for f in os.listdir(path):
         if f.endswith(".txt"):
-            with open(os.path.join(ruta, f), "r", encoding="utf-8") as file:
+            with open(os.path.join(path, f), "r", encoding="utf-8") as file:
                 docs.append({
-                    "nombre": f.replace(".txt",""),
-                    "contenido": file.read()
+                    "name": f.replace(".txt",""),
+                    "content": file.read()
                 })
 
     return docs
@@ -113,58 +152,94 @@ def cargar_docs():
 # =========================
 # DATA
 # =========================
-noticias = obtener_noticias()
-docs = cargar_docs()
+news = get_news()
+docs = get_docs()
 
 # =========================
-# KPIs
+# KPIs (GANCHO VISUAL)
 # =========================
-c1, c2 = st.columns(2)
-c1.metric("Foco", "UE–Mercosur")
-c2.metric("Noticias relevantes", len(noticias))
+c1, c2, c3 = st.columns(3)
+
+c1.markdown("""
+<div class="card">
+<div style="font-size:14px; color:#9da7b3;">Foco</div>
+<div style="font-size:22px; font-weight:700;">UE–Mercosur</div>
+</div>
+""", unsafe_allow_html=True)
+
+c2.markdown(f"""
+<div class="card">
+<div style="font-size:14px; color:#9da7b3;">Noticias relevantes</div>
+<div style="font-size:22px; font-weight:700;">{len(news)}</div>
+</div>
+""", unsafe_allow_html=True)
+
+c3.markdown(f"""
+<div class="card">
+<div style="font-size:14px; color:#9da7b3;">Documentos</div>
+<div style="font-size:22px; font-weight:700;">{len(docs)}</div>
+</div>
+""", unsafe_allow_html=True)
 
 # =========================
 # LAYOUT
 # =========================
-col1, col2 = st.columns([1.6, 1])
+left, right = st.columns([1.6, 1])
 
 # =========================
-# 📰 NOTICIAS
+# 📰 NOTICIAS (FOCO + UX MEJORADA)
 # =========================
-with col1:
+with left:
 
-    st.subheader("📰 Noticias relevantes")
+    st.subheader("📰 Últimas señales del acuerdo")
 
-    if len(noticias) == 0:
-        st.warning("No se encontraron noticias relevantes")
+    if len(news) == 0:
+        st.warning("No se encontraron noticias relevantes del acuerdo UE–Mercosur")
     else:
-        for n in noticias[:15]:
 
-            st.markdown(f"### {n['titulo']}")
-            st.caption(f"{n['fecha']} · score {n['score']}")
-            st.write(n["resumen"])
-            st.link_button("Abrir fuente", n["link"])
-            st.divider()
+        for n in news[:12]:
+
+            st.markdown(f"""
+            <div class="card">
+
+                <div style="font-size:18px; font-weight:600;">
+                    {n['title']}
+                </div>
+
+                <div style="margin-top:6px; color:#9da7b3; font-size:12px;">
+                    {n['date']} · score {n['score']}
+                </div>
+
+                <div style="margin-top:10px;">
+                    {n['summary']}
+                </div>
+
+                <div style="margin-top:12px;">
+                    <a href="{n['link']}" target="_blank">→ Abrir fuente</a>
+                </div>
+
+            </div>
+            """, unsafe_allow_html=True)
 
 # =========================
-# 📄 ANÁLISIS
+# 📄 ANÁLISIS (DESCARGABLES + MÁS LIMPIO)
 # =========================
-with col2:
+with right:
 
-    st.subheader("📄 Análisis")
+    st.subheader("📄 Análisis estratégicos")
 
     if len(docs) == 0:
-        st.info("No hay archivos en /analisis")
+        st.info("No hay documentos en /analisis")
     else:
 
         for d in docs:
 
-            with st.expander(d["nombre"]):
+            with st.expander("📄 " + d["name"]):
 
-                st.write(d["contenido"][:600] + "...")
+                st.write(d["content"][:600] + "...")
 
                 st.download_button(
-                    "⬇️ Descargar",
-                    d["contenido"],
-                    file_name=d["nombre"] + ".txt"
+                    "⬇ Descargar documento",
+                    d["content"],
+                    file_name=d["name"] + ".txt"
                 )
