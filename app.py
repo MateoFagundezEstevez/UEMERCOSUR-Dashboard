@@ -2,6 +2,7 @@ import streamlit as st
 import feedparser
 import pandas as pd
 import os
+from io import StringIO
 from streamlit_autorefresh import st_autorefresh
 
 # =========================
@@ -33,7 +34,7 @@ a { color: #58a6ff; }
 st.title("📊 Dashboard Acuerdo Mercosur - UE")
 
 # =========================
-# RSS NOTICIAS (CON BRIEF)
+# RSS NOTICIAS
 # =========================
 RSS_FEEDS = [
     "https://ec.europa.eu/commission/presscorner/api/rss",
@@ -62,7 +63,7 @@ def obtener_noticias():
     return noticias
 
 # =========================
-# ANÁLISIS DESDE ARCHIVOS
+# ANÁLISIS
 # =========================
 def cargar_analisis():
     ruta = "analisis"
@@ -82,10 +83,46 @@ def cargar_analisis():
     return analisis_list
 
 # =========================
+# CSV SECTORES (ROBUSTO)
+# =========================
+@st.cache_data
+def cargar_sectores():
+    try:
+        ruta = "sectores.csv"
+
+        if not os.path.exists(ruta):
+            st.error("No se encontró sectores.csv en el repositorio")
+            return pd.DataFrame()
+
+        with open(ruta, "r", encoding="utf-8") as f:
+            contenido = f.read()
+
+        contenido = contenido.replace("\ufeff", "")  # BOM fix
+
+        df = pd.read_csv(StringIO(contenido))
+
+        df.columns = df.columns.str.strip().str.lower()
+
+        return df
+
+    except Exception as e:
+        st.error("Error cargando sectores.csv")
+        st.exception(e)
+        return pd.DataFrame()
+
+# =========================
 # DATA
 # =========================
 noticias = obtener_noticias()
 analisis = cargar_analisis()
+df = cargar_sectores()
+
+# =========================
+# VALIDACIÓN CSV
+# =========================
+if df.empty:
+    st.warning("CSV de sectores vacío o no cargado")
+    st.stop()
 
 # =========================
 # KPIs
@@ -93,15 +130,15 @@ analisis = cargar_analisis()
 k1, k2, k3 = st.columns(3)
 k1.metric("Estado", "Negociación")
 k2.metric("Noticias", len(noticias))
-k3.metric("Análisis", len(analisis))
+k3.metric("Sectores", len(df))
 
 # =========================
-# LAYOUT PRINCIPAL
+# LAYOUT
 # =========================
 col1, col2, col3 = st.columns([1.3, 1, 1])
 
 # =========================
-# 📰 NOVEDADES
+# 📰 NOTICIAS
 # =========================
 with col1:
     st.subheader("📰 Novedades")
@@ -117,71 +154,56 @@ with col1:
         """, unsafe_allow_html=True)
 
 # =========================
-# 🏭 SECTORES (FICHA PRO)
+# 🏭 SECTORES
 # =========================
 with col2:
     st.subheader("🏭 Sectores")
 
-    try:
-        df = pd.read_csv("sectores.csv")
+    sectores = df["sector"].dropna().unique()
+    sector_sel = st.selectbox("Seleccionar sector", sectores)
 
-        columnas_esperadas = [
-            "sector","resumen","oportunidad","arancel_actual",
-            "arancel_futuro","cuotas","barreras",
-            "oportunidad_uy","riesgo","comentario_estrategico"
-        ]
+    fila = df[df["sector"] == sector_sel].iloc[0]
 
-        for col in columnas_esperadas:
-            if col not in df.columns:
-                st.error(f"Falta columna: {col}")
-                st.stop()
+    color_oportunidad = "#3fb950" if str(fila.get("oportunidad","")).lower() == "alta" else "#d29922"
+    color_riesgo = "#f85149" if str(fila.get("riesgo","")).lower() == "alto" else "#d29922"
 
-        for _, row in df.iterrows():
+    st.markdown(f"""
+    <div class="panel">
 
-            color_oportunidad = "#3fb950" if row["oportunidad"] == "Alta" else "#d29922"
-            color_riesgo = "#f85149" if row["riesgo"] == "Alto" else "#d29922"
+        <div style="font-size:18px; font-weight:700;">
+            {fila.get('sector','')}
+        </div>
 
-            st.markdown(f"""
-            <div class="panel">
+        <div style="margin-top:8px;">
+            {fila.get('resumen','')}
+        </div>
 
-                <div style="font-size:16px; font-weight:600;">
-                    {row['sector']}
-                </div>
+        <hr style="border:0.5px solid #30363d;">
 
-                <div style="margin-top:6px;">
-                    {row['resumen']}
-                </div>
+        <div style="font-size:13px;">
+            <b>Arancel:</b> {fila.get('arancel_actual','?')} → {fila.get('arancel_futuro','?')}<br>
+            <b>Cuotas:</b> {fila.get('cuotas','?')}<br>
+            <b>Barreras:</b> {fila.get('barreras','?')}<br>
+            <b>Oportunidad UY:</b> {fila.get('oportunidad_uy','?')}<br>
+        </div>
 
-                <hr style="border:0.5px solid #30363d;">
+        <hr style="border:0.5px solid #30363d;">
 
-                <div style="font-size:13px;">
-                    <b>Arancel:</b> {row['arancel_actual']} → {row['arancel_futuro']}<br>
-                    <b>Cuotas:</b> {row['cuotas']}<br>
-                    <b>Barreras:</b> {row['barreras']}<br>
-                    <b>Oportunidad Uruguay:</b> {row['oportunidad_uy']}<br>
-                </div>
+        <div>
+            <span style="color:{color_oportunidad}; font-weight:bold;">
+                Oportunidad: {fila.get('oportunidad','?')}
+            </span> |
+            <span style="color:{color_riesgo}; font-weight:bold;">
+                Riesgo: {fila.get('riesgo','?')}
+            </span>
+        </div>
 
-                <hr style="border:0.5px solid #30363d;">
+        <div style="margin-top:10px;">
+            💡 {fila.get('comentario_estrategico','')}
+        </div>
 
-                <div style="font-size:13px;">
-                    <span style="color:{color_oportunidad}; font-weight:bold;">
-                        Oportunidad: {row['oportunidad']}
-                    </span> |
-                    <span style="color:{color_riesgo}; font-weight:bold;">
-                        Riesgo: {row['riesgo']}
-                    </span>
-                </div>
-
-                <div style="margin-top:8px; font-size:13px;">
-                    💡 {row['comentario_estrategico']}
-                </div>
-
-            </div>
-            """, unsafe_allow_html=True)
-
-    except Exception as e:
-        st.error("Error cargando sectores.csv")
-        st.write(e)
+    </div>
+    """, unsafe_allow_html=True)
 
 # =========================
 # 🧠 ANÁLISIS
@@ -190,7 +212,7 @@ with col3:
     st.subheader("🧠 Análisis")
 
     if len(analisis) == 0:
-        st.info("Cargar archivos en /analisis")
+        st.info("No hay archivos en /analisis")
 
     for titulo, resumen, contenido in analisis[:5]:
         with st.expander(titulo):
