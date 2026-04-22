@@ -73,22 +73,43 @@ def obtener_noticias():
 # =========================
 # ANÁLISIS
 # =========================
-def cargar_analisis():
+# =========================
+# 🧠 DOCUMENTOS (DESCARGABLES)
+# =========================
+with col3:
+    st.subheader("📄 Documentos de análisis")
+
     ruta = "analisis"
-    analisis_list = []
 
-    if os.path.exists(ruta):
-        for archivo in os.listdir(ruta):
-            if archivo.endswith(".txt"):
-                with open(os.path.join(ruta, archivo), "r", encoding="utf-8") as f:
-                    contenido = f.read()
+    if not os.path.exists(ruta):
+        st.info("No hay carpeta /analisis")
+        st.stop()
 
-                titulo = archivo.replace(".txt", "")
-                resumen = contenido[:150] + "..."
+    archivos = [f for f in os.listdir(ruta) if f.endswith(".txt")]
 
-                analisis_list.append((titulo, resumen, contenido))
+    if len(archivos) == 0:
+        st.info("No hay documentos disponibles")
+        st.stop()
 
-    return analisis_list
+    for archivo in archivos:
+
+        path = os.path.join(ruta, archivo)
+
+        with open(path, "r", encoding="utf-8") as f:
+            contenido = f.read()
+
+        nombre = archivo.replace(".txt", "")
+
+        with st.expander(f"📄 {nombre}"):
+
+            st.write(contenido[:300] + "...")
+
+            st.download_button(
+                label="⬇️ Descargar documento",
+                data=contenido,
+                file_name=archivo,
+                mime="text/plain"
+            )
 
 # =========================
 # CSV SECTORES
