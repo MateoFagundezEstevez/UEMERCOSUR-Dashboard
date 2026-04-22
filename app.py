@@ -1,18 +1,24 @@
 import streamlit as st
 import feedparser
+import pandas as pd
+from streamlit_autorefresh import st_autorefresh
 
-st.title("📰 Novedades Mercosur - UE")
+# CONFIGURACIÓN PANTALLA COMPLETA
+st.set_page_config(layout="wide")
 
-seccion = st.sidebar.radio(
-    "Ir a",
-    ["Novedades", "Sectores", "Opinión", "Documentos"]
-)
+# AUTO REFRESH (10 min)
+st_autorefresh(interval=600000)
 
+# TÍTULO
+st.title("🪖 Dashboard Acuerdo Mercosur - UE")
+
+# RSS
 RSS_FEEDS = [
     "https://ec.europa.eu/commission/presscorner/api/rss",
     "https://www.ft.com/rss/world"
 ]
 
+# FUNCIÓN NOTICIAS
 @st.cache_data(ttl=600)
 def obtener_noticias():
     noticias = []
@@ -32,26 +38,68 @@ def obtener_noticias():
 
 noticias = obtener_noticias()
 
-for titulo, link, fecha in noticias:
-    st.subheader(titulo)
-    st.write(fecha)
-    st.markdown(f"[Leer más]({link})")
-    st.divider()
-    
-from streamlit_autorefresh import st_autorefresh
-
-st_autorefresh(interval=600000)  # cada 50 minutos
-
+# FUNCIÓN RESUMEN SIMPLE
 def resumen_simple(texto):
-    return texto[:150] + "..."
+    return texto[:120] + "..."
 
-if seccion == "Opinión":
-    st.title("🧠 Opinión y análisis")
+# =========================
+# 🧱 LAYOUT PRINCIPAL
+# =========================
 
-    noticias = obtener_noticias()  # podés reutilizar tu función
+col1, col2, col3 = st.columns([1.3, 1, 1])
 
-    for titulo, link, fecha in noticias:
-        st.subheader(titulo)
-        st.write(resumen_simple(titulo))
-        st.markdown(f"[Leer nota completa]({link})")
+# 📰 NOVEDADES (IZQUIERDA)
+with col1:
+    st.subheader("📰 Novedades")
+
+    for titulo, link, fecha in noticias[:5]:
+        st.markdown(f"**{titulo}**")
+        st.caption(fecha)
+        st.markdown(f"[Leer más]({link})")
         st.divider()
+
+# 🏭 SECTORES (CENTRO)
+with col2:
+    st.subheader("🏭 Sectores")
+
+    try:
+        df = pd.read_csv("sectores.csv")
+
+        for _, row in df.iterrows():
+            st.markdown(f"**{row['sector']}**")
+            st.write(row["resumen"])
+            st.caption(f"Nivel: {row['oportunidad']}")
+            st.divider()
+
+    except:
+        st.info("Subí un archivo sectores.csv")
+
+# 🧠 OPINIÓN (DERECHA)
+with col3:
+    st.subheader("🧠 Opinión")
+
+    for titulo, link, fecha in noticias[:5]:
+        st.markdown(f"**{titulo}**")
+        st.write(resumen_simple(titulo))
+        st.markdown(f"[Ver análisis]({link})")
+        st.divider()
+
+# =========================
+# 📂 DOCUMENTOS (ABAJO)
+# =========================
+
+st.subheader("📂 Documentos del acuerdo")
+
+colA, colB, colC = st.columns(3)
+
+with colA:
+    st.markdown("### 📜 Acuerdo")
+    st.markdown("[Texto completo](https://example.com)")
+
+with colB:
+    st.markdown("### 📊 Anexos")
+    st.markdown("[Listas arancelarias](https://example.com)")
+
+with colC:
+    st.markdown("### 📅 Cronograma")
+    st.markdown("[Fechas clave](https://example.com)")
