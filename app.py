@@ -12,7 +12,7 @@ st.set_page_config(layout="wide")
 st_autorefresh(interval=600000)
 
 # =========================
-# ESTILO
+# ESTILO GLOBAL
 # =========================
 st.markdown("""
 <style>
@@ -32,6 +32,14 @@ a { color: #58a6ff; }
 """, unsafe_allow_html=True)
 
 st.title("📊 Dashboard Acuerdo Mercosur - UE")
+
+# =========================
+# UTILIDAD
+# =========================
+def limpiar_texto(texto):
+    if pd.isna(texto):
+        return ""
+    return str(texto).replace("\\n", "\n")
 
 # =========================
 # RSS NOTICIAS
@@ -83,32 +91,25 @@ def cargar_analisis():
     return analisis_list
 
 # =========================
-# CSV SECTORES (ROBUSTO)
+# CSV SECTORES
 # =========================
 @st.cache_data
 def cargar_sectores():
-    try:
-        ruta = "sectores.csv"
+    ruta = "sectores.csv"
 
-        if not os.path.exists(ruta):
-            st.error("No se encontró sectores.csv en el repositorio")
-            return pd.DataFrame()
-
-        with open(ruta, "r", encoding="utf-8") as f:
-            contenido = f.read()
-
-        contenido = contenido.replace("\ufeff", "")  # BOM fix
-
-        df = pd.read_csv(StringIO(contenido))
-
-        df.columns = df.columns.str.strip().str.lower()
-
-        return df
-
-    except Exception as e:
-        st.error("Error cargando sectores.csv")
-        st.exception(e)
+    if not os.path.exists(ruta):
+        st.error("No se encontró sectores.csv")
         return pd.DataFrame()
+
+    with open(ruta, "r", encoding="utf-8") as f:
+        contenido = f.read()
+
+    contenido = contenido.replace("\ufeff", "")
+
+    df = pd.read_csv(StringIO(contenido))
+    df.columns = df.columns.str.strip().str.lower()
+
+    return df
 
 # =========================
 # DATA
@@ -117,11 +118,8 @@ noticias = obtener_noticias()
 analisis = cargar_analisis()
 df = cargar_sectores()
 
-# =========================
-# VALIDACIÓN CSV
-# =========================
 if df.empty:
-    st.warning("CSV de sectores vacío o no cargado")
+    st.warning("CSV vacío o no cargado correctamente")
     st.stop()
 
 # =========================
@@ -133,7 +131,7 @@ k2.metric("Noticias", len(noticias))
 k3.metric("Sectores", len(df))
 
 # =========================
-# LAYOUT
+# LAYOUT PRINCIPAL
 # =========================
 col1, col2, col3 = st.columns([1.3, 1, 1])
 
@@ -154,7 +152,7 @@ with col1:
         """, unsafe_allow_html=True)
 
 # =========================
-# 🏭 SECTORES
+# 🏭 SECTORES (CORREGIDO)
 # =========================
 with col2:
     st.subheader("🏭 Sectores")
@@ -164,46 +162,41 @@ with col2:
 
     fila = df[df["sector"] == sector_sel].iloc[0]
 
-    color_oportunidad = "#3fb950" if str(fila.get("oportunidad","")).lower() == "alta" else "#d29922"
-    color_riesgo = "#f85149" if str(fila.get("riesgo","")).lower() == "alto" else "#d29922"
+    st.markdown(f"## {fila.get('sector','')}")
 
-    st.markdown(f"""
-    <div class="panel">
+    st.write(limpiar_texto(fila.get("resumen","")))
 
-        <div style="font-size:18px; font-weight:700;">
-            {fila.get('sector','')}
-        </div>
+    st.divider()
 
-        <div style="margin-top:8px;">
-            {fila.get('resumen','')}
-        </div>
+    c1, c2 = st.columns(2)
 
-        <hr style="border:0.5px solid #30363d;">
+    with c1:
+        st.metric("Arancel actual", fila.get("arancel_actual",""))
+        st.metric("Cuotas", fila.get("cuotas",""))
 
-        <div style="font-size:13px;">
-            <b>Arancel:</b> {fila.get('arancel_actual','?')} → {fila.get('arancel_futuro','?')}<br>
-            <b>Cuotas:</b> {fila.get('cuotas','?')}<br>
-            <b>Barreras:</b> {fila.get('barreras','?')}<br>
-            <b>Oportunidad UY:</b> {fila.get('oportunidad_uy','?')}<br>
-        </div>
+    with c2:
+        st.metric("Arancel futuro", fila.get("arancel_futuro",""))
+        st.metric("Barreras", fila.get("barreras",""))
 
-        <hr style="border:0.5px solid #30363d;">
+    st.divider()
 
-        <div>
-            <span style="color:{color_oportunidad}; font-weight:bold;">
-                Oportunidad: {fila.get('oportunidad','?')}
-            </span> |
-            <span style="color:{color_riesgo}; font-weight:bold;">
-                Riesgo: {fila.get('riesgo','?')}
-            </span>
-        </div>
+    st.subheader("Oportunidad Uruguay")
+    st.write(limpiar_texto(fila.get("oportunidad_uy","")))
 
-        <div style="margin-top:10px;">
-            💡 {fila.get('comentario_estrategico','')}
-        </div>
+    colA, colB = st.columns(2)
 
-    </div>
-    """, unsafe_allow_html=True)
+    with colA:
+        st.markdown("**Oportunidad**")
+        st.write(fila.get("oportunidad",""))
+
+    with colB:
+        st.markdown("**Riesgo**")
+        st.write(fila.get("riesgo",""))
+
+    st.divider()
+
+    st.subheader("💡 Insight estratégico")
+    st.write(limpiar_texto(fila.get("comentario_estrategico","")))
 
 # =========================
 # 🧠 ANÁLISIS
