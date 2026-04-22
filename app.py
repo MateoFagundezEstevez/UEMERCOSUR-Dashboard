@@ -3,6 +3,11 @@ import feedparser
 
 st.title("📰 Novedades Mercosur - UE")
 
+seccion = st.sidebar.radio(
+    "Ir a",
+    ["Novedades", "Sectores", "Opinión", "Documentos"]
+)
+
 RSS_FEEDS = [
     "https://ec.europa.eu/commission/presscorner/api/rss",
     "https://www.ft.com/rss/world"
