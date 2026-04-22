@@ -86,22 +86,17 @@ def cargar_analisis():
 # =========================
 def cargar_sectores():
     try:
-        df = pd.read_csv(
-            "sectores.csv",
-            sep=",",
-            quotechar='"',
-            engine="python",
-            on_bad_lines="skip"
-        )
+        # Leer archivo como texto crudo
+        with open("sectores.csv", "r", encoding="utf-8") as f:
+            contenido = f.read()
 
-        # Si quedó todo en una columna, reintentar
-        if len(df.columns) == 1:
-            df = pd.read_csv(
-                "sectores.csv",
-                sep=";",
-                engine="python",
-                on_bad_lines="skip"
-            )
+        # 🔥 FIX: si el header está entre comillas lo limpiamos
+        if contenido.startswith('"'):
+            contenido = contenido.replace('"', '')
+
+        # Convertir a DataFrame
+        from io import StringIO
+        df = pd.read_csv(StringIO(contenido), sep=",")
 
         # Limpiar columnas
         df.columns = df.columns.str.strip().str.lower()
