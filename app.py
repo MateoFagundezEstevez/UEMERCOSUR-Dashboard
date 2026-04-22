@@ -32,3 +32,7 @@ for titulo, link, fecha in noticias:
     st.write(fecha)
     st.markdown(f"[Leer más]({link})")
     st.divider()
+    
+from streamlit_autorefresh import st_autorefresh
+
+st_autorefresh(interval=600000)  # cada 50 minutos
