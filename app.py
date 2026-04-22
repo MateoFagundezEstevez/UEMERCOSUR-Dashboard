@@ -123,7 +123,8 @@ with col2:
     st.subheader("🏭 Sectores")
 
     try:
-        df = pd.read_csv("sectores.csv")
+        df = pd.read_csv("sectores.csv", sep=None, engine="python")
+df.columns = df.columns.str.strip().str.lower()
 
         columnas_esperadas = [
             "sector","resumen","oportunidad","arancel_actual",
