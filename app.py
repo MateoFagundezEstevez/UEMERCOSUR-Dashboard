@@ -131,7 +131,7 @@ k2.metric("Noticias", len(noticias))
 k3.metric("Sectores", len(df))
 
 # =========================
-# LAYOUT PRINCIPAL
+# LAYOUT
 # =========================
 col1, col2, col3 = st.columns([1.3, 1, 1])
 
@@ -152,7 +152,7 @@ with col1:
         """, unsafe_allow_html=True)
 
 # =========================
-# 🏭 SECTORES (CORREGIDO)
+# 🏭 SECTORES (SIMPLIFICADO)
 # =========================
 with col2:
     st.subheader("🏭 Sectores")
@@ -168,30 +168,17 @@ with col2:
 
     st.divider()
 
-    c1, c2 = st.columns(2)
-
-    with c1:
-        st.metric("Arancel actual", fila.get("arancel_actual",""))
-        st.metric("Cuotas", fila.get("cuotas",""))
-
-    with c2:
-        st.metric("Arancel futuro", fila.get("arancel_futuro",""))
-        st.metric("Barreras", fila.get("barreras",""))
-
-    st.divider()
-
-    st.subheader("Oportunidad Uruguay")
-    st.write(limpiar_texto(fila.get("oportunidad_uy","")))
-
+    # SOLO OPORTUNIDAD Y RIESGO
     colA, colB = st.columns(2)
 
     with colA:
-        st.markdown("**Oportunidad**")
-        st.write(fila.get("oportunidad",""))
+        st.markdown("### Oportunidad Uruguay")
+        st.write(limpiar_texto(fila.get("oportunidad_uy","")))
 
     with colB:
-        st.markdown("**Riesgo**")
-        st.write(fila.get("riesgo",""))
+        st.markdown("### Nivel")
+        st.write(f"**Oportunidad:** {fila.get('oportunidad','')}")
+        st.write(f"**Riesgo:** {fila.get('riesgo','')}")
 
     st.divider()
 
