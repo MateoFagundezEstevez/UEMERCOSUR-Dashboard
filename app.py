@@ -10,79 +10,77 @@ st.set_page_config(page_title="UE–Mercosur Intelligence", layout="wide")
 st_autorefresh(interval=600000)
 
 # =========================
-# ESTILO (UI MÁS PREMIUM)
+# ESTILO SIMPLE PERO LIMPIO
 # =========================
 st.markdown("""
 <style>
 .block-container {
     background-color: #0e1117;
     color: #e6edf3;
-    padding-top: 2rem;
 }
 
 .card {
     background-color: #161b22;
     border: 1px solid #30363d;
-    padding: 16px;
+    padding: 14px;
     border-radius: 12px;
     margin-bottom: 12px;
 }
 
-.title {
-    font-size: 28px;
-    font-weight: 700;
+h1, h2, h3 {
+    color: #e6edf3;
 }
-
-.subtitle {
-    color: #9da7b3;
-    margin-bottom: 20px;
-}
-
-.badge {
-    display:inline-block;
-    padding:4px 8px;
-    border-radius:6px;
-    font-size:12px;
-    margin-right:6px;
-}
-
-.badge.green { background:#1f6f3a; }
-.badge.blue { background:#1f3a6f; }
-
-a { color: #58a6ff; text-decoration: none; }
 </style>
 """, unsafe_allow_html=True)
 
-# =========================
-# HEADER (MÁS INVITACIÓN)
-# =========================
-st.markdown('<div class="title">📊 UE–Mercosur Intelligence Brief</div>', unsafe_allow_html=True)
-st.markdown('<div class="subtitle">Seguimiento estratégico del acuerdo comercial Unión Europea – Mercosur</div>', unsafe_allow_html=True)
+st.title("📊 UE–Mercosur Intelligence Brief")
 
 # =========================
-# FOCO SEMÁNTICO REAL
+# FOCO REALISTA (NO ULTRA RÍGIDO)
 # =========================
 def es_relevante(texto):
 
-    texto = texto.lower()
+    t = texto.lower()
 
-    # explícito
-    if "ue mercosur" in texto or "eu mercosur" in texto or "acuerdo ue mercosur" in texto:
+    # 🎯 caso fuerte (acuerdo explícito)
+    if "mercosur" in t and ("eu" in t or "ue" in t or "european union" in t):
         return True
 
-    # ambos conceptos juntos
-    ue = "eu" in texto or "ue" in texto or "unión europea" in texto
-    mercosur = "mercosur" in texto
+    if "ue mercosur" in t or "eu mercosur" in t:
+        return True
 
-    return ue and mercosur
+    # 🎯 caso medio (temática comercio + regiones)
+    score = 0
+
+    keywords = [
+        "mercosur",
+        "european union",
+        "unión europea",
+        "eu",
+        "ue",
+        "trade",
+        "comercio",
+        "tariff",
+        "arancel",
+        "agreement",
+        "acuerdo"
+    ]
+
+    for k in keywords:
+        if k in t:
+            score += 1
+
+    return score >= 3
 
 # =========================
-# RSS
+# RSS (realistas y suficientes)
 # =========================
-RSS = [
+RSS_FEEDS = [
     "https://www.elpais.com.uy/rss/portada.xml",
     "https://www.elobservador.com.uy/rss/portada.xml",
     "https://www.montevideo.com.uy/noticias/rss",
+    "https://www.lr21.com.uy/feed",
+    "https://www.teledoce.com/feed/",
     "https://www.ft.com/rss/world",
     "https://www.economist.com/latest/rss.xml",
     "https://ec.europa.eu/commission/presscorner/api/rss"
@@ -96,7 +94,7 @@ def get_news():
 
     news = []
 
-    for url in RSS:
+    for url in RSS_FEEDS:
 
         try:
             feed = feedparser.parse(url)
@@ -108,12 +106,12 @@ def get_news():
                 date = e.get("published", "Sin fecha")
                 summary = (e.get("summary", "") or "")[:220]
 
-                text = (title + " " + summary)
+                text = title + " " + summary
 
                 if not es_relevante(text):
                     continue
 
-                score = sum(k in text.lower() for k in ["eu", "ue", "mercosur", "acuerdo"])
+                score = sum(k in text.lower() for k in ["mercosur", "eu", "ue", "trade", "agreement"])
 
                 news.append({
                     "title": title,
@@ -156,28 +154,21 @@ news = get_news()
 docs = get_docs()
 
 # =========================
-# KPIs (GANCHO VISUAL)
+# KPIs
 # =========================
-c1, c2, c3 = st.columns(3)
+c1, c2 = st.columns(2)
 
-c1.markdown("""
+c1.markdown(f"""
 <div class="card">
-<div style="font-size:14px; color:#9da7b3;">Foco</div>
-<div style="font-size:22px; font-weight:700;">UE–Mercosur</div>
+<h3>📌 Foco</h3>
+<p>UE–Mercosur Intelligence System</p>
 </div>
 """, unsafe_allow_html=True)
 
 c2.markdown(f"""
 <div class="card">
-<div style="font-size:14px; color:#9da7b3;">Noticias relevantes</div>
-<div style="font-size:22px; font-weight:700;">{len(news)}</div>
-</div>
-""", unsafe_allow_html=True)
-
-c3.markdown(f"""
-<div class="card">
-<div style="font-size:14px; color:#9da7b3;">Documentos</div>
-<div style="font-size:22px; font-weight:700;">{len(docs)}</div>
+<h3>📰 Noticias relevantes</h3>
+<p style="font-size:22px;"><b>{len(news)}</b></p>
 </div>
 """, unsafe_allow_html=True)
 
@@ -187,14 +178,14 @@ c3.markdown(f"""
 left, right = st.columns([1.6, 1])
 
 # =========================
-# 📰 NOTICIAS (FOCO + UX MEJORADA)
+# 📰 NOTICIAS
 # =========================
 with left:
 
-    st.subheader("📰 Últimas señales del acuerdo")
+    st.subheader("📰 Señales del acuerdo UE–Mercosur")
 
     if len(news) == 0:
-        st.warning("No se encontraron noticias relevantes del acuerdo UE–Mercosur")
+        st.warning("No se encontraron señales claras del acuerdo en este momento.")
     else:
 
         for n in news[:12]:
@@ -202,44 +193,40 @@ with left:
             st.markdown(f"""
             <div class="card">
 
-                <div style="font-size:18px; font-weight:600;">
-                    {n['title']}
-                </div>
+                <h3>{n['title']}</h3>
 
-                <div style="margin-top:6px; color:#9da7b3; font-size:12px;">
+                <small style="color:#9da7b3;">
                     {n['date']} · score {n['score']}
-                </div>
+                </small>
 
-                <div style="margin-top:10px;">
+                <p style="margin-top:10px;">
                     {n['summary']}
-                </div>
+                </p>
 
-                <div style="margin-top:12px;">
-                    <a href="{n['link']}" target="_blank">→ Abrir fuente</a>
-                </div>
+                <a href="{n['link']}" target="_blank">→ Abrir fuente</a>
 
             </div>
             """, unsafe_allow_html=True)
 
 # =========================
-# 📄 ANÁLISIS (DESCARGABLES + MÁS LIMPIO)
+# 📄 ANÁLISIS
 # =========================
 with right:
 
     st.subheader("📄 Análisis estratégicos")
 
     if len(docs) == 0:
-        st.info("No hay documentos en /analisis")
+        st.info("No hay documentos cargados")
     else:
 
         for d in docs:
 
-            with st.expander("📄 " + d["name"]):
+            with st.expander(d["name"]):
 
                 st.write(d["content"][:600] + "...")
 
                 st.download_button(
-                    "⬇ Descargar documento",
+                    "⬇ Descargar",
                     d["content"],
                     file_name=d["name"] + ".txt"
                 )
