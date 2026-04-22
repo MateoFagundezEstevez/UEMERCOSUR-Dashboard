@@ -2,7 +2,8 @@ import streamlit as st
 import feedparser
 import pandas as pd
 import os
-from io import StringIO
+import requests
+from bs4 import BeautifulSoup
 from streamlit_autorefresh import st_autorefresh
 
 # =========================
@@ -12,7 +13,7 @@ st.set_page_config(layout="wide")
 st_autorefresh(interval=600000)
 
 # =========================
-# ESTILO GLOBAL
+# ESTILO
 # =========================
 st.markdown("""
 <style>
@@ -31,202 +32,297 @@ a { color: #58a6ff; }
 </style>
 """, unsafe_allow_html=True)
 
-st.title("📊 Dashboard Acuerdo Mercosur - UE")
+st.title("📊 Motor de Inteligencia Diplomática UE – Mercosur")
 
 # =========================
-# UTILIDAD
+# FILTROS CLAVE
 # =========================
-def limpiar_texto(texto):
-    if pd.isna(texto):
-        return ""
-    return str(texto).replace("\\n", "\n")
-
-# =========================
-# RSS NOTICIAS
-# =========================
-RSS_FEEDS = [
-    "https://ec.europa.eu/commission/presscorner/api/rss",
-    "https://www.ft.com/rss/world"
+FILTROS = [
+    "mercosur", "ue", "eu", "unión europea",
+    "uruguay", "export", "comercio",
+    "arancel", "acuerdo", "trade", "tariff"
 ]
 
+# =========================
+# RSS MEDIOS
+# =========================
+RSS_URUGUAY = [
+    "https://www.elpais.com.uy/rss/portada.xml",
+    "https://www.elobservador.com.uy/rss/portada.xml",
+    "https://www.montevideo.com.uy/noticias/rss",
+    "https://www.lr21.com.uy/feed",
+    "https://www.teledoce.com/feed/",
+    "https://www.subrayado.com.uy/rss"
+]
+
+RSS_INTERNACIONAL = [
+    "https://www.ft.com/rss/world",
+    "https://www.economist.com/latest/rss.xml",
+    "https://www.reuters.com/rssFeed/worldNews",
+    "https://ec.europa.eu/commission/presscorner/api/rss"
+]
+
+# =========================
+# FUENTES INSTITUCIONALES
+# =========================
+FUENTES_INSTITUCIONALES = [
+    {
+        "nombre": "Cancillería Uruguay",
+        "url": "https://www.gub.uy/ministerio-relaciones-exteriores/comunicacion/noticias/rss"
+    },
+    {
+        "nombre": "Cámara de Industrias del Uruguay",
+        "url": "https://ciu.com.uy/feed/"
+    }
+]
+
+# =========================
+# EXPERTOS (CURADO)
+# =========================
+EXPERTOS = [
+    {
+        "nombre": "Ignacio Bartesaghi",
+        "rol": "Académico UCU",
+        "idea": "Inserción internacional urgente de Uruguay en acuerdos globales."
+    },
+    {
+        "nombre": "Valeria Csukasi",
+        "rol": "Cancillería",
+        "idea": "El acuerdo UE–Mercosur requiere implementación gradual y ratificación política."
+    }
+]
+
+# =========================
+# UTILIDAD SCORE
+# =========================
+def score(texto, prioridad):
+    s = 0
+    texto = texto.lower()
+
+    if prioridad == 1:
+        s += 3
+
+    if any(k in texto for k in ["mercosur", "ue", "eu"]):
+        s += 3
+
+    if any(k in texto for k in ["export", "comercio", "arancel"]):
+        s += 2
+
+    return s
+
+# =========================
+# NOTICIAS
+# =========================
 @st.cache_data(ttl=600)
 def obtener_noticias():
+
     noticias = []
 
-    for url in RSS_FEEDS:
-        feed = feedparser.parse(url)
+    def procesar(url, fuente, prioridad):
 
-        for entry in feed.entries:
-            titulo = entry.get("title", "")
-            link = entry.get("link", "")
-            fecha = entry.get("published", "Sin fecha")
+        try:
+            feed = feedparser.parse(url)
 
-            resumen = entry.get("summary", "") or entry.get("description", "")
-            resumen = resumen.replace("<p>", "").replace("</p>", "")
-            resumen = resumen[:200] + "..." if len(resumen) > 200 else resumen
+            for e in feed.entries:
 
-            if "mercosur" in titulo.lower() or "eu" in titulo.lower():
-                noticias.append((titulo, resumen, link, fecha))
+                titulo = e.get("title", "")
+                link = e.get("link", "")
+                fecha = e.get("published", "Sin fecha")
 
-    return noticias
+                resumen = (e.get("summary", "") or "")[:250]
+
+                texto = (titulo + " " + resumen).lower()
+
+                if not any(f in texto for f in FILTROS):
+                    continue
+
+                noticias.append({
+                    "titulo": titulo,
+                    "resumen": resumen,
+                    "link": link,
+                    "fecha": fecha,
+                    "fuente": fuente,
+                    "prioridad": prioridad
+                })
+
+        except:
+            pass
+
+    for u in RSS_URUGUAY:
+        procesar(u, "Uruguay", 1)
+
+    for u in RSS_INTERNACIONAL:
+        procesar(u, "Internacional", 2)
+
+    return sorted(noticias, key=lambda x: score(x["titulo"], x["prioridad"]), reverse=True)
 
 # =========================
-# ANÁLISIS
+# INSTITUCIONES
 # =========================
-def cargar_analisis():
+@st.cache_data(ttl=600)
+def obtener_instituciones():
+
+    resultados = []
+
+    for f in FUENTES_INSTITUCIONALES:
+
+        try:
+            feed = feedparser.parse(f["url"])
+
+            for e in feed.entries:
+
+                texto = (e.get("title","") + " " + e.get("summary","")).lower()
+
+                if not any(k in texto for k in FILTROS):
+                    continue
+
+                resultados.append({
+                    "titulo": e.get("title",""),
+                    "link": e.get("link",""),
+                    "fuente": f["nombre"],
+                    "tipo": "institucional"
+                })
+
+        except:
+            continue
+
+    return resultados
+
+# =========================
+# DOCUMENTOS
+# =========================
+def cargar_docs():
     ruta = "analisis"
-    analisis_list = []
-
-    if os.path.exists(ruta):
-        for archivo in os.listdir(ruta):
-            if archivo.endswith(".txt"):
-                with open(os.path.join(ruta, archivo), "r", encoding="utf-8") as f:
-                    contenido = f.read()
-
-                titulo = archivo.replace(".txt", "")
-                resumen = contenido[:150] + "..."
-
-                analisis_list.append((titulo, resumen, contenido))
-
-    return analisis_list
-
-# =========================
-# CSV SECTORES
-# =========================
-@st.cache_data
-def cargar_sectores():
-    ruta = "sectores.csv"
+    docs = []
 
     if not os.path.exists(ruta):
-        st.error("No se encontró sectores.csv")
-        return pd.DataFrame()
+        return []
 
-    with open(ruta, "r", encoding="utf-8") as f:
-        contenido = f.read()
+    for f in os.listdir(ruta):
+        if f.endswith(".txt"):
+            with open(os.path.join(ruta, f), "r", encoding="utf-8") as file:
+                docs.append({
+                    "nombre": f.replace(".txt",""),
+                    "contenido": file.read()
+                })
 
-    contenido = contenido.replace("\ufeff", "")
-
-    df = pd.read_csv(StringIO(contenido))
-    df.columns = df.columns.str.strip().str.lower()
-
-    return df
+    return docs
 
 # =========================
 # DATA
 # =========================
 noticias = obtener_noticias()
-analisis = cargar_analisis()
-df = cargar_sectores()
-
-if df.empty:
-    st.warning("CSV vacío o no cargado correctamente")
-    st.stop()
+instituciones = obtener_instituciones()
+docs = cargar_docs()
 
 # =========================
 # KPIs
 # =========================
-k1, k2, k3 = st.columns(3)
-k1.metric("Estado", "Negociación")
-k2.metric("Noticias", len(noticias))
-k3.metric("Sectores", len(df))
+c1, c2, c3 = st.columns(3)
+c1.metric("Estado", "UE–Mercosur")
+c2.metric("Noticias", len(noticias))
+c3.metric("Fuentes institucionales", len(instituciones))
 
 # =========================
 # LAYOUT
 # =========================
-col1, col2, col3 = st.columns([1.3, 1, 1])
+col1, col2, col3 = st.columns([1.4, 1, 1])
 
 # =========================
 # 📰 NOTICIAS
 # =========================
 with col1:
-    st.subheader("📰 Novedades")
+    st.subheader("📰 Inteligencia de Noticias")
 
-    for titulo, resumen, link, fecha in noticias[:6]:
+    for n in noticias[:10]:
+
+        color = "#3fb950" if n["prioridad"] == 1 else "#9da7b3"
+
         st.markdown(f"""
         <div class="panel">
-            <div style="font-weight:600;">{titulo}</div>
-            <div style="font-size:12px; color:#9da7b3;">{fecha}</div>
-            <div style="margin-top:8px;">{resumen}</div>
-            <a href="{link}" target="_blank">Leer más</a>
+
+            <div style="font-weight:700; color:{color}">
+                {n['titulo']}
+            </div>
+
+            <div style="font-size:11px; color:#9da7b3;">
+                {n['fecha']} · {n['fuente']}
+            </div>
+
+            <div style="margin-top:8px;">
+                {n['resumen']}
+            </div>
+
+            <a href="{n['link']}" target="_blank">Leer más</a>
+
         </div>
         """, unsafe_allow_html=True)
 
 # =========================
-# 🏭 SECTORES (SIMPLIFICADO)
+# 🏛️ INSTITUCIONES + EXPERTOS
 # =========================
 with col2:
-    st.subheader("🏭 Sectores")
 
-    sectores = df["sector"].dropna().unique()
-    sector_sel = st.selectbox("Seleccionar sector", sectores)
+    st.subheader("🏛️ Instituciones")
 
-    fila = df[df["sector"] == sector_sel].iloc[0]
+    for i in instituciones[:8]:
 
-    st.markdown(f"## {fila.get('sector','')}")
+        st.markdown(f"""
+        <div class="panel">
 
-    st.write(limpiar_texto(fila.get("resumen","")))
+            <div style="font-weight:700;">
+                {i['titulo']}
+            </div>
 
-    st.divider()
+            <div style="font-size:11px; color:#9da7b3;">
+                {i['fuente']}
+            </div>
 
-    # SOLO OPORTUNIDAD Y RIESGO
-    colA, colB = st.columns(2)
+            <a href="{i['link']}" target="_blank">Ver fuente</a>
 
-    with colA:
-        st.markdown("### Oportunidad Uruguay")
-        st.write(limpiar_texto(fila.get("oportunidad_uy","")))
+        </div>
+        """, unsafe_allow_html=True)
 
-    with colB:
-        st.markdown("### Nivel")
-        st.write(f"**Oportunidad:** {fila.get('oportunidad','')}")
-        st.write(f"**Riesgo:** {fila.get('riesgo','')}")
+    st.subheader("🧠 Expertos")
 
-    st.divider()
+    for e in EXPERTOS:
 
-    st.subheader("💡 Insight estratégico")
-    st.write(limpiar_texto(fila.get("comentario_estrategico","")))
+        st.markdown(f"""
+        <div class="panel">
+
+            <div style="font-weight:700;">
+                {e['nombre']}
+            </div>
+
+            <div style="font-size:11px; color:#9da7b3;">
+                {e['rol']}
+            </div>
+
+            <div style="margin-top:8px;">
+                {e['idea']}
+            </div>
+
+        </div>
+        """, unsafe_allow_html=True)
 
 # =========================
-# 🧠 ANÁLISIS
+# 📄 DOCUMENTOS
 # =========================
 with col3:
-    st.subheader("🧠 Análisis")
 
-    if len(analisis) == 0:
-        st.info("No hay archivos en /analisis")
+    st.subheader("📄 Documentos")
 
-    for titulo, resumen, contenido in analisis[:5]:
-        with st.expander(titulo):
-            st.write(resumen)
-            st.write("---")
-            st.write(contenido)
+    if len(docs) == 0:
+        st.info("No hay documentos")
 
-# =========================
-# 📂 DOCUMENTOS
-# =========================
-st.subheader("📂 Documentos")
+    for d in docs:
 
-colA, colB, colC = st.columns(3)
+        with st.expander(d["nombre"]):
 
-with colA:
-    st.markdown("""
-    <div class="panel">
-    📜 <b>Texto del acuerdo</b><br>
-    <a href="#">Ver documento</a>
-    </div>
-    """, unsafe_allow_html=True)
+            st.write(d["contenido"][:300] + "...")
 
-with colB:
-    st.markdown("""
-    <div class="panel">
-    📊 <b>Anexos</b><br>
-    <a href="#">Ver anexos</a>
-    </div>
-    """, unsafe_allow_html=True)
-
-with colC:
-    st.markdown("""
-    <div class="panel">
-    📅 <b>Cronograma</b><br>
-    <a href="#">Ver fechas</a>
-    </div>
-    """, unsafe_allow_html=True)
+            st.download_button(
+                "Descargar",
+                d["contenido"],
+                file_name=d["nombre"] + ".txt"
+            )
