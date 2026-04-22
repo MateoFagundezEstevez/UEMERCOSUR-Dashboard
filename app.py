@@ -33,7 +33,7 @@ a { color: #58a6ff; }
 st.title("📊 Dashboard Acuerdo Mercosur - UE")
 
 # =========================
-# RSS NOTICIAS (CON BRIEF)
+# RSS NOTICIAS
 # =========================
 RSS_FEEDS = [
     "https://ec.europa.eu/commission/presscorner/api/rss",
@@ -62,7 +62,7 @@ def obtener_noticias():
     return noticias
 
 # =========================
-# ANÁLISIS DESDE ARCHIVOS
+# ANÁLISIS
 # =========================
 def cargar_analisis():
     ruta = "analisis"
@@ -82,10 +82,43 @@ def cargar_analisis():
     return analisis_list
 
 # =========================
+# CARGA ROBUSTA CSV
+# =========================
+def cargar_sectores():
+    try:
+        df = pd.read_csv(
+            "sectores.csv",
+            sep=",",
+            quotechar='"',
+            engine="python",
+            on_bad_lines="skip"
+        )
+
+        # Si quedó todo en una columna, reintentar
+        if len(df.columns) == 1:
+            df = pd.read_csv(
+                "sectores.csv",
+                sep=";",
+                engine="python",
+                on_bad_lines="skip"
+            )
+
+        # Limpiar columnas
+        df.columns = df.columns.str.strip().str.lower()
+
+        return df
+
+    except Exception as e:
+        st.error("Error leyendo sectores.csv")
+        st.write(e)
+        return None
+
+# =========================
 # DATA
 # =========================
 noticias = obtener_noticias()
 analisis = cargar_analisis()
+df = cargar_sectores()
 
 # =========================
 # KPIs
@@ -96,7 +129,7 @@ k2.metric("Noticias", len(noticias))
 k3.metric("Análisis", len(analisis))
 
 # =========================
-# LAYOUT PRINCIPAL
+# LAYOUT
 # =========================
 col1, col2, col3 = st.columns([1.3, 1, 1])
 
@@ -122,73 +155,63 @@ with col1:
 with col2:
     st.subheader("🏭 Sectores")
 
-    try:
-        # Leer CSV automáticamente (detecta , o ;)
-        df = pd.read_csv("sectores.csv", sep=None, engine="python")
+    if df is None:
+        st.stop()
 
-        # Limpiar nombres columnas
-        df.columns = df.columns.str.strip().str.lower()
+    columnas_esperadas = [
+        "sector","resumen","oportunidad","arancel_actual",
+        "arancel_futuro","cuotas","barreras",
+        "oportunidad_uy","riesgo","comentario_estrategico"
+    ]
 
-        # Validar columnas
-        columnas_esperadas = [
-            "sector","resumen","oportunidad","arancel_actual",
-            "arancel_futuro","cuotas","barreras",
-            "oportunidad_uy","riesgo","comentario_estrategico"
-        ]
+    for col in columnas_esperadas:
+        if col not in df.columns:
+            st.error(f"Falta columna: {col}")
+            st.write("Columnas detectadas:", df.columns)
+            st.stop()
 
-        for col in columnas_esperadas:
-            if col not in df.columns:
-                st.error(f"Falta columna: {col}")
-                st.write("Columnas detectadas:", df.columns)
-                st.stop()
+    for _, row in df.iterrows():
 
-        # Render fichas
-        for _, row in df.iterrows():
+        color_oportunidad = "#3fb950" if row["oportunidad"] == "Alta" else "#d29922"
+        color_riesgo = "#f85149" if row["riesgo"] == "Alto" else "#d29922"
 
-            color_oportunidad = "#3fb950" if row["oportunidad"] == "Alta" else "#d29922"
-            color_riesgo = "#f85149" if row["riesgo"] == "Alto" else "#d29922"
+        st.markdown(f"""
+        <div class="panel">
 
-            st.markdown(f"""
-            <div class="panel">
-
-                <div style="font-size:16px; font-weight:600;">
-                    {row['sector']}
-                </div>
-
-                <div style="margin-top:6px;">
-                    {row['resumen']}
-                </div>
-
-                <hr style="border:0.5px solid #30363d;">
-
-                <div style="font-size:13px;">
-                    <b>Arancel:</b> {row['arancel_actual']} → {row['arancel_futuro']}<br>
-                    <b>Cuotas:</b> {row['cuotas']}<br>
-                    <b>Barreras:</b> {row['barreras']}<br>
-                    <b>Oportunidad Uruguay:</b> {row['oportunidad_uy']}<br>
-                </div>
-
-                <hr style="border:0.5px solid #30363d;">
-
-                <div style="font-size:13px;">
-                    <span style="color:{color_oportunidad}; font-weight:bold;">
-                        Oportunidad: {row['oportunidad']}
-                    </span> |
-                    <span style="color:{color_riesgo}; font-weight:bold;">
-                        Riesgo: {row['riesgo']}
-                    </span>
-                </div>
-
-                <div style="margin-top:8px; font-size:13px;">
-                    💡 {row['comentario_estrategico']}
-                </div>
-
+            <div style="font-size:16px; font-weight:600;">
+                {row['sector']}
             </div>
-            """, unsafe_allow_html=True)
 
-    except Exception as e:
-        st.error("Error cargando sectores.csv")
-        st.write(e)
+            <div style="margin-top:6px;">
+                {row['resumen']}
+            </div>
+
+            <hr style="border:0.5px solid #30363d;">
+
+            <div style="font-size:13px;">
+                <b>Arancel:</b> {row['arancel_actual']} → {row['arancel_futuro']}<br>
+                <b>Cuotas:</b> {row['cuotas']}<br>
+                <b>Barreras:</b> {row['barreras']}<br>
+                <b>Oportunidad Uruguay:</b> {row['oportunidad_uy']}<br>
+            </div>
+
+            <hr style="border:0.5px solid #30363d;">
+
+            <div style="font-size:13px;">
+                <span style="color:{color_oportunidad}; font-weight:bold;">
+                    Oportunidad: {row['oportunidad']}
+                </span> |
+                <span style="color:{color_riesgo}; font-weight:bold;">
+                    Riesgo: {row['riesgo']}
+                </span>
+            </div>
+
+            <div style="margin-top:8px; font-size:13px;">
+                💡 {row['comentario_estrategico']}
+            </div>
+
+        </div>
+        """, unsafe_allow_html=True)
 
 # =========================
 # 🧠 ANÁLISIS
