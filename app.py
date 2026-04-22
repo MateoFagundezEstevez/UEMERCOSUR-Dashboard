@@ -152,66 +152,68 @@ with col1:
 # =========================
 # 🏭 SECTORES
 # =========================
+# =========================
+# 🏭 SECTORES INTERACTIVO
+# =========================
 with col2:
     st.subheader("🏭 Sectores")
 
-    if df is None:
+    if df is None or df.empty:
+        st.warning("No hay datos en sectores.csv")
         st.stop()
 
-    columnas_esperadas = [
-        "sector","resumen","oportunidad","arancel_actual",
-        "arancel_futuro","cuotas","barreras",
-        "oportunidad_uy","riesgo","comentario_estrategico"
-    ]
+    # Selector de sector
+    sector_seleccionado = st.selectbox(
+        "Seleccionar sector",
+        df["sector"]
+    )
 
-    for col in columnas_esperadas:
-        if col not in df.columns:
-            st.error(f"Falta columna: {col}")
-            st.write("Columnas detectadas:", df.columns)
-            st.stop()
+    # Filtrar
+    fila = df[df["sector"] == sector_seleccionado].iloc[0]
 
-    for _, row in df.iterrows():
+    # Colores
+    color_oportunidad = "#3fb950" if fila["oportunidad"] == "Alta" else "#d29922"
+    color_riesgo = "#f85149" if fila["riesgo"] == "Alto" else "#d29922"
 
-        color_oportunidad = "#3fb950" if row["oportunidad"] == "Alta" else "#d29922"
-        color_riesgo = "#f85149" if row["riesgo"] == "Alto" else "#d29922"
+    # Render ficha
+    st.markdown(f"""
+    <div class="panel">
 
-        st.markdown(f"""
-        <div class="panel">
-
-            <div style="font-size:16px; font-weight:600;">
-                {row['sector']}
-            </div>
-
-            <div style="margin-top:6px;">
-                {row['resumen']}
-            </div>
-
-            <hr style="border:0.5px solid #30363d;">
-
-            <div style="font-size:13px;">
-                <b>Arancel:</b> {row['arancel_actual']} → {row['arancel_futuro']}<br>
-                <b>Cuotas:</b> {row['cuotas']}<br>
-                <b>Barreras:</b> {row['barreras']}<br>
-                <b>Oportunidad Uruguay:</b> {row['oportunidad_uy']}<br>
-            </div>
-
-            <hr style="border:0.5px solid #30363d;">
-
-            <div style="font-size:13px;">
-                <span style="color:{color_oportunidad}; font-weight:bold;">
-                    Oportunidad: {row['oportunidad']}
-                </span> |
-                <span style="color:{color_riesgo}; font-weight:bold;">
-                    Riesgo: {row['riesgo']}
-                </span>
-            </div>
-
-            <div style="margin-top:8px; font-size:13px;">
-                💡 {row['comentario_estrategico']}
-            </div>
-
+        <div style="font-size:18px; font-weight:700;">
+            {fila['sector']}
         </div>
-        """, unsafe_allow_html=True)
+
+        <div style="margin-top:8px;">
+            {fila['resumen']}
+        </div>
+
+        <hr style="border:0.5px solid #30363d;">
+
+        <div style="font-size:13px;">
+            <b>Arancel:</b> {fila['arancel_actual']} → {fila['arancel_futuro']}<br>
+            <b>Cuotas:</b> {fila['cuotas']}<br>
+            <b>Barreras:</b> {fila['barreras']}<br>
+            <b>Oportunidad Uruguay:</b> {fila['oportunidad_uy']}<br>
+        </div>
+
+        <hr style="border:0.5px solid #30363d;">
+
+        <div style="font-size:14px;">
+            <span style="color:{color_oportunidad}; font-weight:bold;">
+                Oportunidad: {fila['oportunidad']}
+            </span> |
+            <span style="color:{color_riesgo}; font-weight:bold;">
+                Riesgo: {fila['riesgo']}
+            </span>
+        </div>
+
+        <div style="margin-top:10px; font-size:14px;">
+            💡 <b>Insight estratégico:</b><br>
+            {fila['comentario_estrategico']}
+        </div>
+
+    </div>
+    """, unsafe_allow_html=True)
 
 # =========================
 # 🧠 ANÁLISIS
