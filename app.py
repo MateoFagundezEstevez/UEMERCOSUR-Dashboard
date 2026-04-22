@@ -117,7 +117,7 @@ with col1:
         """, unsafe_allow_html=True)
 
 # =========================
-# 🏭 SECTORES
+# 🏭 SECTORES (FICHA PRO)
 # =========================
 with col2:
     st.subheader("🏭 Sectores")
@@ -125,17 +125,63 @@ with col2:
     try:
         df = pd.read_csv("sectores.csv")
 
+        columnas_esperadas = [
+            "sector","resumen","oportunidad","arancel_actual",
+            "arancel_futuro","cuotas","barreras",
+            "oportunidad_uy","riesgo","comentario_estrategico"
+        ]
+
+        for col in columnas_esperadas:
+            if col not in df.columns:
+                st.error(f"Falta columna: {col}")
+                st.stop()
+
         for _, row in df.iterrows():
+
+            color_oportunidad = "#3fb950" if row["oportunidad"] == "Alta" else "#d29922"
+            color_riesgo = "#f85149" if row["riesgo"] == "Alto" else "#d29922"
+
             st.markdown(f"""
             <div class="panel">
-                <div style="font-weight:600;">{row['sector']}</div>
-                <div>{row['resumen']}</div>
-                <div style="color:#3fb950;">Nivel: {row['oportunidad']}</div>
+
+                <div style="font-size:16px; font-weight:600;">
+                    {row['sector']}
+                </div>
+
+                <div style="margin-top:6px;">
+                    {row['resumen']}
+                </div>
+
+                <hr style="border:0.5px solid #30363d;">
+
+                <div style="font-size:13px;">
+                    <b>Arancel:</b> {row['arancel_actual']} → {row['arancel_futuro']}<br>
+                    <b>Cuotas:</b> {row['cuotas']}<br>
+                    <b>Barreras:</b> {row['barreras']}<br>
+                    <b>Oportunidad Uruguay:</b> {row['oportunidad_uy']}<br>
+                </div>
+
+                <hr style="border:0.5px solid #30363d;">
+
+                <div style="font-size:13px;">
+                    <span style="color:{color_oportunidad}; font-weight:bold;">
+                        Oportunidad: {row['oportunidad']}
+                    </span> |
+                    <span style="color:{color_riesgo}; font-weight:bold;">
+                        Riesgo: {row['riesgo']}
+                    </span>
+                </div>
+
+                <div style="margin-top:8px; font-size:13px;">
+                    💡 {row['comentario_estrategico']}
+                </div>
+
             </div>
             """, unsafe_allow_html=True)
 
-    except:
-        st.info("Subí sectores.csv")
+    except Exception as e:
+        st.error("Error cargando sectores.csv")
+        st.write(e)
 
 # =========================
 # 🧠 ANÁLISIS
