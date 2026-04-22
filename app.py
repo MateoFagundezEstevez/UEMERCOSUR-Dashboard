@@ -11,7 +11,7 @@ st.set_page_config(layout="wide")
 st_autorefresh(interval=600000)
 
 # =========================
-# ESTILO SIMPLE (ESTABLE)
+# ESTILO BÁSICO
 # =========================
 st.markdown("""
 <style>
@@ -22,15 +22,31 @@ st.markdown("""
 </style>
 """, unsafe_allow_html=True)
 
-st.title("📊 Inteligencia Económica UE – Mercosur")
+st.title("📊 Inteligencia UE–Mercosur")
 
 # =========================
-# FILTROS
+# FOCO ESTRATÉGICO (CLAVE)
 # =========================
-FILTROS = [
-    "mercosur", "ue", "eu", "unión europea",
-    "uruguay", "export", "comercio",
-    "arancel", "acuerdo", "trade"
+KEYWORDS_CORE = [
+    "ue mercosur",
+    "eu mercosur",
+    "unión europea mercosur",
+    "acuerdo ue mercosur",
+    "trade agreement mercosur eu",
+    "free trade agreement mercosur",
+    "ratificación ue mercosur",
+    "negociación ue mercosur"
+]
+
+KEYWORDS_CONTEXT = [
+    "mercosur",
+    "unión europea",
+    "european union",
+    "arancel",
+    "tariff",
+    "comercio",
+    "trade",
+    "acuerdo"
 ]
 
 # =========================
@@ -52,7 +68,7 @@ RSS_GLOBAL = [
 ]
 
 # =========================
-# NOTICIAS
+# NOTICIAS (FOCUS ENGINE)
 # =========================
 @st.cache_data(ttl=600)
 def obtener_noticias():
@@ -74,7 +90,13 @@ def obtener_noticias():
 
                 texto = (titulo + " " + resumen).lower()
 
-                if not any(f in texto for f in FILTROS):
+                # =========================
+                # FILTRO INTELIGENTE
+                # =========================
+                core_hit = any(k in texto for k in KEYWORDS_CORE)
+                context_hits = sum(k in texto for k in KEYWORDS_CONTEXT)
+
+                if not (core_hit or context_hits >= 2):
                     continue
 
                 noticias.append({
@@ -83,7 +105,8 @@ def obtener_noticias():
                     "link": link,
                     "fecha": fecha,
                     "fuente": fuente,
-                    "prioridad": prioridad
+                    "prioridad": prioridad,
+                    "score": (5 if core_hit else 0) + context_hits
                 })
 
         except:
@@ -95,11 +118,7 @@ def obtener_noticias():
     for u in RSS_GLOBAL:
         procesar(u, "Internacional", 2)
 
-    return sorted(
-        noticias,
-        key=lambda x: (x["prioridad"], x["titulo"]),
-        reverse=True
-    )
+    return sorted(noticias, key=lambda x: x["score"], reverse=True)
 
 # =========================
 # SECTORES
@@ -147,8 +166,8 @@ docs = cargar_docs()
 # KPIs
 # =========================
 c1, c2, c3 = st.columns(3)
-c1.metric("Estado", "UE–Mercosur")
-c2.metric("Noticias", len(noticias))
+c1.metric("Foco", "UE–Mercosur")
+c2.metric("Noticias relevantes", len(noticias))
 c3.metric("Sectores", len(df))
 
 # =========================
@@ -157,20 +176,18 @@ c3.metric("Sectores", len(df))
 col1, col2, col3 = st.columns([1.4, 1, 1])
 
 # =========================
-# 📰 NOTICIAS (CORREGIDO)
+# 📰 NOTICIAS (FOCO REAL)
 # =========================
 with col1:
 
-    st.subheader("📰 Noticias relevantes")
+    st.subheader("📰 Acuerdo UE–Mercosur")
 
     for n in noticias[:12]:
 
-        icon = "🟢" if n["prioridad"] == 1 else "🔵"
-
-        st.markdown(f"### {icon} {n['titulo']}")
-        st.caption(f"{n['fecha']} · {n['fuente']}")
+        st.markdown(f"### {n['titulo']}")
+        st.caption(f"{n['fecha']} · {n['fuente']} · score {n['score']}")
         st.write(n["resumen"])
-        st.link_button("Leer fuente", n["link"])
+        st.link_button("Abrir fuente", n["link"])
         st.divider()
 
 # =========================
@@ -196,13 +213,13 @@ with col2:
         st.write("### Oportunidad Uruguay")
         st.write(row.get("oportunidad_uy",""))
 
-        st.write("### Riesgo / Oportunidad")
-        st.write(f"**Oportunidad:** {row.get('oportunidad','')}")
-        st.write(f"**Riesgo:** {row.get('riesgo','')}")
+        st.write("### Evaluación")
+        st.write(f"Oportunidad: {row.get('oportunidad','')}")
+        st.write(f"Riesgo: {row.get('riesgo','')}")
 
         st.divider()
 
-        st.write("💡 **Insight estratégico**")
+        st.write("💡 Insight estratégico")
         st.write(row.get("comentario_estrategico",""))
 
 # =========================
@@ -213,16 +230,16 @@ with col3:
     st.subheader("📄 Documentos")
 
     if len(docs) == 0:
-        st.info("No hay documentos en /analisis")
-    else:
-        for d in docs:
+        st.info("No hay documentos")
 
-            with st.expander(d["nombre"]):
+    for d in docs:
 
-                st.write(d["contenido"][:500] + "...")
+        with st.expander(d["nombre"]):
 
-                st.download_button(
-                    "⬇️ Descargar",
-                    d["contenido"],
-                    file_name=d["nombre"] + ".txt"
-                )
+            st.write(d["contenido"][:500] + "...")
+
+            st.download_button(
+                "⬇️ Descargar",
+                d["contenido"],
+                file_name=d["nombre"] + ".txt"
+            )
