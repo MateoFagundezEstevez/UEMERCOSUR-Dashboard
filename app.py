@@ -36,3 +36,17 @@ for titulo, link, fecha in noticias:
 from streamlit_autorefresh import st_autorefresh
 
 st_autorefresh(interval=600000)  # cada 50 minutos
+
+def resumen_simple(texto):
+    return texto[:150] + "..."
+
+if seccion == "Opinión":
+    st.title("🧠 Opinión y análisis")
+
+    noticias = obtener_noticias()  # podés reutilizar tu función
+
+    for titulo, link, fecha in noticias:
+        st.subheader(titulo)
+        st.write(resumen_simple(titulo))
+        st.markdown(f"[Leer nota completa]({link})")
+        st.divider()
