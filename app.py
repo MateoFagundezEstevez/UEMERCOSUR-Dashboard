@@ -4,11 +4,14 @@ import pandas as pd
 import os
 from streamlit_autorefresh import st_autorefresh
 
+# =========================
+# CONFIG
+# =========================
 st.set_page_config(layout="wide")
 st_autorefresh(interval=600000)
 
 # =========================
-# ESTILO (LEGIBLE)
+# ESTILO
 # =========================
 st.markdown("""
 <style>
@@ -27,10 +30,10 @@ a { color: #58a6ff; }
 </style>
 """, unsafe_allow_html=True)
 
-st.title("📊 Dashboard Mercosur - UE")
+st.title("📊 Dashboard Acuerdo Mercosur - UE")
 
 # =========================
-# RSS
+# RSS NOTICIAS (CON BRIEF)
 # =========================
 RSS_FEEDS = [
     "https://ec.europa.eu/commission/presscorner/api/rss",
@@ -49,10 +52,7 @@ def obtener_noticias():
             link = entry.get("link", "")
             fecha = entry.get("published", "Sin fecha")
 
-            # 👇 CLAVE: summary o description
             resumen = entry.get("summary", "") or entry.get("description", "")
-
-            # limpieza básica
             resumen = resumen.replace("<p>", "").replace("</p>", "")
             resumen = resumen[:200] + "..." if len(resumen) > 200 else resumen
 
@@ -61,28 +61,9 @@ def obtener_noticias():
 
     return noticias
 
-noticias = obtener_noticias()
-
 # =========================
-# LAYOUT
+# ANÁLISIS DESDE ARCHIVOS
 # =========================
-col1, col2 = st.columns([2, 1])
-
-# 📰 NOVEDADES CON BRIEF
-with col1:
-    st.subheader("📰 Novedades")
-
-    for titulo, resumen, link, fecha in noticias[:6]:
-        st.markdown(f"""
-        <div class="panel">
-            <div style="font-weight:600;">{titulo}</div>
-            <div style="font-size:13px; color:#9da7b3;">{fecha}</div>
-            <div style="margin-top:8px;">{resumen}</div>
-            <a href="{link}" target="_blank">Leer más</a>
-        </div>
-        """, unsafe_allow_html=True)
-
-# 🧠 ANÁLISIS (ARCHIVOS)
 def cargar_analisis():
     ruta = "analisis"
     analisis_list = []
@@ -100,13 +81,104 @@ def cargar_analisis():
 
     return analisis_list
 
+# =========================
+# DATA
+# =========================
+noticias = obtener_noticias()
+analisis = cargar_analisis()
+
+# =========================
+# KPIs
+# =========================
+k1, k2, k3 = st.columns(3)
+k1.metric("Estado", "Negociación")
+k2.metric("Noticias", len(noticias))
+k3.metric("Análisis", len(analisis))
+
+# =========================
+# LAYOUT PRINCIPAL
+# =========================
+col1, col2, col3 = st.columns([1.3, 1, 1])
+
+# =========================
+# 📰 NOVEDADES
+# =========================
+with col1:
+    st.subheader("📰 Novedades")
+
+    for titulo, resumen, link, fecha in noticias[:6]:
+        st.markdown(f"""
+        <div class="panel">
+            <div style="font-weight:600;">{titulo}</div>
+            <div style="font-size:12px; color:#9da7b3;">{fecha}</div>
+            <div style="margin-top:8px;">{resumen}</div>
+            <a href="{link}" target="_blank">Leer más</a>
+        </div>
+        """, unsafe_allow_html=True)
+
+# =========================
+# 🏭 SECTORES
+# =========================
 with col2:
+    st.subheader("🏭 Sectores")
+
+    try:
+        df = pd.read_csv("sectores.csv")
+
+        for _, row in df.iterrows():
+            st.markdown(f"""
+            <div class="panel">
+                <div style="font-weight:600;">{row['sector']}</div>
+                <div>{row['resumen']}</div>
+                <div style="color:#3fb950;">Nivel: {row['oportunidad']}</div>
+            </div>
+            """, unsafe_allow_html=True)
+
+    except:
+        st.info("Subí sectores.csv")
+
+# =========================
+# 🧠 ANÁLISIS
+# =========================
+with col3:
     st.subheader("🧠 Análisis")
 
-    analisis = cargar_analisis()
+    if len(analisis) == 0:
+        st.info("Cargar archivos en /analisis")
 
     for titulo, resumen, contenido in analisis[:5]:
         with st.expander(titulo):
             st.write(resumen)
             st.write("---")
             st.write(contenido)
+
+# =========================
+# 📂 DOCUMENTOS
+# =========================
+st.subheader("📂 Documentos")
+
+colA, colB, colC = st.columns(3)
+
+with colA:
+    st.markdown("""
+    <div class="panel">
+    📜 <b>Texto del acuerdo</b><br>
+    <a href="#">Ver documento</a>
+    </div>
+    """, unsafe_allow_html=True)
+
+with colB:
+    st.markdown("""
+    <div class="panel">
+    📊 <b>Anexos</b><br>
+    <a href="#">Ver anexos</a>
+    </div>
+    """, unsafe_allow_html=True)
+
+with colC:
+    st.markdown("""
+    <div class="panel">
+    📅 <b>Cronograma</b><br>
+    <a href="#">Ver fechas</a>
+    </div>
+    """, unsafe_allow_html=True)
